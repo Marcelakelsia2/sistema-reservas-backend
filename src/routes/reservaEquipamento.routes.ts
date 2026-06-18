@@ -5,8 +5,8 @@ import {
   minhas,
   ver,
   cancelar,
-  historico,
-  conflitos
+  editar,
+  disponibilidade, comprovativo,
 } from "../controllers/reservaEquipamento.controller";
 
 import { autenticar } from "../middlewares/autenticar";
@@ -17,32 +17,22 @@ const router = Router();
 /**
  * @swagger
  * tags:
- *   name: Reservas de Equipamentos
+ *   name: ReservasEquipamento
  *   description: Gestão de reservas de equipamentos
  */
 
+//
+// =======================
+// CRIAR RESERVA
+// =======================
 /**
- * =========================
- * CRIAR RESERVA
- * =========================
  * @swagger
- * /api/reservas-equipamentos:
+ * /api/reservas-equipamento:
  *   post:
  *     summary: Criar reserva de equipamento
- *     tags: [Reservas de Equipamentos]
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       Permissões:
- *       - ADMIN
- *       - FUNCIONARIO
- *       - USUARIO
- *
- *       Regras:
- *       - Não pode exceder quantidade disponível
- *       - Não pode haver conflito de horário/data
- *       - Equipamento deve estar disponível
- *       - Reserva pode ser por intervalo de tempo
  *     requestBody:
  *       required: true
  *       content:
@@ -58,50 +48,50 @@ const router = Router();
  *             properties:
  *               equipamentoId:
  *                 type: integer
- *                 example: 2
+ *                 example: 1
  *               quantidade:
  *                 type: integer
- *                 example: 1
+ *                 example: 2
  *               data:
  *                 type: string
  *                 format: date
- *                 example: "2026-05-28"
+ *                 example: "2026-06-10"
  *               horaInicio:
  *                 type: string
  *                 example: "08:00"
  *               horaFim:
  *                 type: string
- *                 example: "12:00"
+ *                 example: "10:00"
  *               observacao:
  *                 type: string
- *                 example: "Projetor para apresentação"
+ *                 example: "Para apresentação"
  *     responses:
  *       201:
  *         description: Reserva criada com sucesso
  *       400:
- *         description: Erro de validação ou conflito
- *       401:
- *         description: Não autenticado
+ *         description: Dados inválidos
+ *       409:
+ *         description: Quantidade indisponível para o horário
  */
 router.post(
   "/",
   autenticar,
   permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
-
+  criar
 );
 
+//
+// =======================
+// LISTAR TODAS
+// =======================
 /**
- * =========================
- * LISTAR TODAS
- * =========================
  * @swagger
- * /api/reservas-equipamentos:
+ * /api/reservas-equipamento:
  *   get:
- *     summary: Listar reservas de equipamentos
- *     tags: [Reservas de Equipamentos]
+ *     summary: Listar todas as reservas de equipamento
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
- *     description: Apenas ADMIN e FUNCIONARIO
  *     responses:
  *       200:
  *         description: Lista de reservas
@@ -113,20 +103,21 @@ router.get(
   listar
 );
 
+//
+// =======================
+// MINHAS RESERVAS
+// =======================
 /**
- * =========================
- * MINHAS RESERVAS
- * =========================
  * @swagger
- * /api/reservas-equipamentos/minhas:
+ * /api/reservas-equipamento/minhas:
  *   get:
- *     summary: Minhas reservas de equipamentos
- *     tags: [Reservas de Equipamentos]
+ *     summary: Listar as minhas reservas de equipamento
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lista do utilizador
+ *         description: Lista do utilizador autenticado
  */
 router.get(
   "/minhas",
@@ -135,15 +126,55 @@ router.get(
   minhas
 );
 
+//
+// =======================
+// DISPONIBILIDADE
+// =======================
 /**
- * =========================
- * VER RESERVA
- * =========================
  * @swagger
- * /api/reservas-equipamentos/{id}:
+ * /api/reservas-equipamento/equipamento/{equipamentoId}/disponibilidade:
  *   get:
- *     summary: Ver reserva de equipamento
- *     tags: [Reservas de Equipamentos]
+ *     summary: Ver disponibilidade de um equipamento numa data
+ *     tags: [ReservasEquipamento]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: equipamentoId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *       - in: query
+ *         name: data
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-06-10"
+ *     responses:
+ *       200:
+ *         description: Disponibilidade retornada com sucesso
+ *       400:
+ *         description: Data inválida ou em falta
+ *       404:
+ *         description: Equipamento não encontrado
+ */
+router.get(
+  "/equipamento/:equipamentoId/disponibilidade",
+  autenticar,
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  disponibilidade
+);
+
+//COMPROVATIVO
+
+/**
+ * @swagger
+ * /api/reservas-equipamento/{id}/comprovativo:
+ *   get:
+ *     summary: Baixar comprovativo de reserva de equipamento
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -152,11 +183,53 @@ router.get(
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 5
+ *     responses:
+ *       200:
+ *         description: PDF gerado com sucesso
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       403:
+ *         description: Sem permissão
+ *       404:
+ *         description: Reserva não encontrada
+ */
+router.get(
+  "/:id/comprovativo",
+  autenticar,
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  comprovativo
+);
+
+//
+// =======================
+// VER RESERVA
+// =======================
+/**
+ * @swagger
+ * /api/reservas-equipamento/{id}:
+ *   get:
+ *     summary: Ver reserva de equipamento por ID
+ *     tags: [ReservasEquipamento]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
  *     responses:
  *       200:
  *         description: Reserva encontrada
+ *       403:
+ *         description: Sem permissão
  *       404:
- *         description: Não encontrada
+ *         description: Reserva não encontrada
  */
 router.get(
   "/:id",
@@ -165,15 +238,16 @@ router.get(
   ver
 );
 
+//
+// =======================
+// CANCELAR RESERVA
+// =======================
 /**
- * =========================
- * CANCELAR
- * =========================
  * @swagger
- * /api/reservas-equipamentos/{id}/cancelar:
+ * /api/reservas-equipamento/{id}/cancelar:
  *   patch:
  *     summary: Cancelar reserva de equipamento
- *     tags: [Reservas de Equipamentos]
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -182,9 +256,25 @@ router.get(
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 5
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo:
+ *                 type: string
+ *                 example: "Equipamento avariado"
  *     responses:
  *       200:
- *         description: Cancelado com sucesso
+ *         description: Reserva cancelada com sucesso
+ *       400:
+ *         description: Reserva já cancelada ou concluída / motivo em falta
+ *       403:
+ *         description: Sem permissão
+ *       404:
+ *         description: Reserva não encontrada
  */
 router.patch(
   "/:id/cancelar",
@@ -193,48 +283,71 @@ router.patch(
   cancelar
 );
 
+//
+// =======================
+// EDITAR RESERVA
+// =======================
 /**
- * =========================
- * HISTÓRICO
- * =========================
  * @swagger
- * /api/reservas-equipamentos/historico:
- *   get:
- *     summary: Histórico de reservas de equipamentos
- *     tags: [Reservas de Equipamentos]
+ * /api/reservas-equipamento/{id}:
+ *   patch:
+ *     summary: Editar reserva de equipamento
+ *     tags: [ReservasEquipamento]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               equipamentoId:
+ *                 type: integer
+ *                 example: 1
+ *               quantidade:
+ *                 type: integer
+ *                 example: 3
+ *               data:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-06-10"
+ *               horaInicio:
+ *                 type: string
+ *                 example: "09:00"
+ *               horaFim:
+ *                 type: string
+ *                 example: "11:00"
+ *               observacao:
+ *                 type: string
+ *                 example: "Actualização da reserva"
+ *               motivoEdicao:
+ *                 type: string
+ *                 example: "Pedido do utilizador"
  *     responses:
  *       200:
- *         description: Histórico carregado
+ *         description: Reserva editada com sucesso
+ *       400:
+ *         description: Dados inválidos ou horário no passado
+ *       403:
+ *         description: Sem permissão
+ *       404:
+ *         description: Reserva não encontrada
+ *       409:
+ *         description: Quantidade indisponível para o horário
  */
-router.get(
-  "/historico",
+router.patch(
+  "/:id",
   autenticar,
   permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
-  historico
-);
-
-/**
- * =========================
- * CONFLITOS
- * =========================
- * @swagger
- * /api/reservas-equipamentos/conflitos:
- *   get:
- *     summary: Ver conflitos de equipamentos
- *     tags: [Reservas de Equipamentos]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de conflitos
- */
-router.get(
-  "/conflitos",
-  autenticar,
-  permitirPapeis("ADMIN", "FUNCIONARIO"),
-  conflitos
+  editar
 );
 
 export default router;

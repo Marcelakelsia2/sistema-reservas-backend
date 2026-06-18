@@ -1,8 +1,9 @@
 import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
-  host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === "true",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -15,7 +16,7 @@ export async function enviarEmail(
   mensagem: string
 ) {
   await transporter.sendMail({
-    from: "Sistema Reservas <no-reply@sistema.com>",
+    from: `Sistema Reservas <${process.env.EMAIL_FROM}>`,
     to: destino,
     subject: assunto,
     text: mensagem,

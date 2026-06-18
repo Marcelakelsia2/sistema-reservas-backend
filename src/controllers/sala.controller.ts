@@ -1,104 +1,145 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import * as service from "../services/sala.service";
 
-// CRIAR SALA
-export async function criar(req: Request, res: Response) {
-  const sala = await service.criar(req.body);
+// ─── CRIAR SALA ───────────────────────────────────────────────────────────────
 
-  return res.status(201).json({
-    sucesso: true,
-    mensagem: "Sala criada com sucesso",
-    dados: sala,
-  });
+export async function criar(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const sala = await service.criar(req.body);
+    return res.status(201).json({
+      sucesso: true,
+      mensagem: "Sala criada com sucesso",
+      dados: sala,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// LISTAR SALAS
-export async function listar(req: Request, res: Response) {
-  const salas = await service.listar();
+// ─── LISTAR SALAS ─────────────────────────────────────────────────────────────
 
-  return res.status(200).json({
-    sucesso: true,
-    dados: salas,
-  });
+export async function listar(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const salas = await service.listar();
+    return res.status(200).json({
+      sucesso: true,
+      dados: salas,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// VER SALA
-export async function ver(req: Request, res: Response) {
-  const sala = await service.ver(Number(req.params.id));
+// ─── VER SALA ─────────────────────────────────────────────────────────────────
 
-  return res.status(200).json({
-    sucesso: true,
-    dados: sala,
-  });
+export async function ver(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const id = Number(req.params.id);
+    const sala = await service.ver(id);
+    return res.status(200).json({
+      sucesso: true,
+      dados: sala,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// EDITAR SALA
-export async function editar(req: Request, res: Response) {
-  const sala = await service.editar(
-    Number(req.params.id),
-    req.body
-  );
+// ─── EDITAR SALA ──────────────────────────────────────────────────────────────
 
-  return res.status(200).json({
-    sucesso: true,
-    mensagem: "Sala actualizada com sucesso",
-    dados: sala,
-  });
+export async function editar(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const id = Number(req.params.id);
+    const sala = await service.editar(id, req.body);
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: "Sala actualizada com sucesso",
+      dados: sala,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// ALTERAR DISPONIBILIDADE
+// ─── ALTERAR DISPONIBILIDADE ──────────────────────────────────────────────────
+
 export async function disponibilidade(
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) {
-  const sala = await service.alterarDisponibilidade(
-    Number(req.params.id),
-    req.body.estado
-  );
-
-  return res.status(200).json({
-    sucesso: true,
-    mensagem: "Estado actualizado com sucesso",
-    dados: sala,
-  });
+  try {
+    const id = Number(req.params.id);
+    const sala = await service.alterarDisponibilidade(id, req.body.estado);
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: "Estado actualizado com sucesso",
+      dados: sala,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// REMOVER SALA
-export async function remover(req: Request, res: Response) {
-  await service.remover(Number(req.params.id));
+// ─── REMOVER SALA ─────────────────────────────────────────────────────────────
 
-  return res.status(200).json({
-    sucesso: true,
-    mensagem: "Sala removida com sucesso",
-  });
+export async function remover(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const id = Number(req.params.id);
+    await service.remover(id);
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: "Sala removida com sucesso",
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-// SALAS DISPONÍVEIS
+// ─── SALAS DISPONÍVEIS ────────────────────────────────────────────────────────
+
 export async function disponiveis(
   req: Request,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) {
-  const salas = await service.disponiveis({
-    data: String(req.query.data),
-    horaInicio: String(req.query.horaInicio),
-    horaFim: String(req.query.horaFim),
-  });
+  try {
+    //  query params ausentes chegam como undefined — String(undefined) === "undefined"
+    // Por isso usamos o valor bruto e deixamos o service validar
+    const salas = await service.disponiveis({
+      data: req.query.data as string | undefined,
+      horaInicio: req.query.horaInicio as string | undefined,
+      horaFim: req.query.horaFim as string | undefined,
+      capacidadeMinima: req.query.capacidadeMinima
+        ? Number(req.query.capacidadeMinima)
+        : undefined,
+    });
 
-  return res.status(200).json({
-    sucesso: true,
-    dados: salas,
-  });
-}
-
-// CONFLITOS
-export async function conflitos(
-  req: Request,
-  res: Response
-) {
-  const conflitos = await service.conflitos();
-
-  return res.status(200).json({
-    sucesso: true,
-    dados: conflitos,
-  });
+    return res.status(200).json({
+      sucesso: true,
+      dados: salas,
+    });
+  } catch (err) {
+    next(err);
+  }
 }

@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger";
 import { errorMiddleware } from "./middlewares/error";
 import rotas from "./routes";
+import passport from "./config/passport";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
+app.use(passport.initialize());
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api", rotas);

@@ -1,4 +1,6 @@
 // Gera código numérico de 6 dígitos
+import { randomInt } from "crypto";
+
 export function gerarCodigo(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }

@@ -8,7 +8,7 @@ export function errorMiddleware(
   res: Response,
   next: NextFunction
 ) {
-  // 🔥 ERRO DE VALIDAÇÃO (ZOD)
+  //ERRO DE VALIDAÇÃO (ZOD)
   if (err instanceof ZodError) {
     return res.status(400).json({
       erro: true,
@@ -17,7 +17,7 @@ export function errorMiddleware(
     });
   }
 
-  // 🔥 ERRO PERSONALIZADO
+  // ERRO PERSONALIZADO
   const status = err.status || 500;
 
   return res.status(status).json({

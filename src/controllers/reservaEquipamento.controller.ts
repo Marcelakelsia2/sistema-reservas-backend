@@ -1,133 +1,143 @@
-import { prisma } from "../lib/prisma";
-import { HttpError } from "../utils/httpError";
+import { Request, Response, NextFunction } from "express";
+import * as service from "../services/reservaEquipamento.service";
 
-/**
- * VALIDAR CONFLITO DE HORÁRIO
- */
-function conflitoHorario(novoInicio: Date, novoFim: Date, existenteInicio: Date, existenteFim: Date) {
-  return (
-    (novoInicio >= existenteInicio && novoInicio < existenteFim) ||
-    (novoFim > existenteInicio && novoFim <= existenteFim) ||
-    (novoInicio <= existenteInicio && novoFim >= existenteFim)
-  );
+// ─── Tipo ─────────────────────────────────────────────────────────────────────
+
+interface ReqComUsuario extends Request {
+  usuario: { id: number; role: "ADMIN" | "FUNCIONARIO" | "USUARIO" };
 }
 
-/**
- * CRIAR RESERVA DE EQUIPAMENTO
- */
-export async function criar(data: any, usuarioId: number) {
-  const equipamento = await prisma.equipamento.findUnique({
-    where: { id: data.equipamentoId }
-  });
+// ─── CRIAR ────────────────────────────────────────────────────────────────────
 
-  if (!equipamento) throw new HttpError("Equipamento não encontrado", 404);
-
-  if (data.quantidade > equipamento.quantidadeDisponivel) {
-    throw new HttpError("Quantidade indisponível", 400);
+export async function criar(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reserva = await service.criar(
+      req.body,
+      (req as ReqComUsuario).usuario.id
+    );
+    return res.status(201).json({
+      sucesso: true,
+      mensagem: "Reserva criada com sucesso",
+      dados: reserva,
+    });
+  } catch (err) {
+    next(err);
   }
+}
 
-  const inicio = new Date(data.horaInicio);
-  const fim = new Date(data.horaFim);
+// ─── LISTAR ───────────────────────────────────────────────────────────────────
 
-  if (inicio >= fim) {
-    throw new HttpError("Hora início deve ser menor que fim", 400);
+export async function listar(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reservas = await service.listar();
+    return res.status(200).json({
+      sucesso: true,
+      dados: reservas,
+    });
+  } catch (err) {
+    next(err);
   }
+}
 
-  const reservas = await prisma.reservaEquipamento.findMany({
-    where: {
-      equipamentoId: data.equipamentoId,
-      status: "PENDENTE"
-    }
-  });
+// ─── MINHAS ───────────────────────────────────────────────────────────────────
 
-  for (const r of reservas) {
-    if (
-      conflitoHorario(inicio, fim, new Date(r.horaInicio), new Date(r.horaFim))
-    ) {
-      throw new HttpError("Conflito de horário com outra reserva", 409);
-    }
+export async function minhas(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reservas = await service.minhas(
+      (req as ReqComUsuario).usuario.id
+    );
+    return res.status(200).json({
+      sucesso: true,
+      dados: reservas,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  return prisma.reservaEquipamento.create({
-    data: {
-      ...data,
-      usuarioId
-    }
-  });
 }
 
-/**
- * LISTAR TODAS
- */
-export async function listar() {
-  return prisma.reservaEquipamento.findMany({
-    include: { equipamento: true, usuario: true }
-  });
-}
+// ─── VER ──────────────────────────────────────────────────────────────────────
 
-/**
- * MINHAS RESERVAS
- */
-export async function minhas(usuarioId: number) {
-  return prisma.reservaEquipamento.findMany({
-    where: { usuarioId },
-    include: { equipamento: true }
-  });
-}
-
-/**
- * VER
- */
-export async function ver(id: number, usuario: any) {
-  const reserva = await prisma.reservaEquipamento.findUnique({
-    where: { id },
-    include: { equipamento: true }
-  });
-
-  if (!reserva) throw new HttpError("Reserva não encontrada", 404);
-
-  if (usuario.role === "USUARIO" && reserva.usuarioId !== usuario.id) {
-    throw new HttpError("Sem permissão", 403);
+export async function ver(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reserva = await service.ver(
+      Number(req.params.id),
+      (req as ReqComUsuario).usuario
+    );
+    return res.status(200).json({
+      sucesso: true,
+      dados: reserva,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  return reserva;
 }
 
-/**
- * CANCELAR
- */
-export async function cancelar(id: number, usuario: any) {
-  const reserva = await prisma.reservaEquipamento.findUnique({
-    where: { id }
-  });
+// ─── CANCELAR ─────────────────────────────────────────────────────────────────
 
-  if (!reserva) throw new HttpError("Reserva não encontrada", 404);
-
-  if (usuario.role === "USUARIO" && reserva.usuarioId !== usuario.id) {
-    throw new HttpError("Sem permissão", 403);
+export async function cancelar(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reserva = await service.cancelar(
+      Number(req.params.id),
+      (req as ReqComUsuario).usuario,
+      req.body.motivo
+    );
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: "Reserva cancelada com sucesso",
+      dados: reserva,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  return prisma.reservaEquipamento.update({
-    where: { id },
-    data: { status: "CANCELADA" }
-  });
 }
 
-/**
- * HISTÓRICO
- */
-export async function historico(usuarioId: number) {
-  return prisma.reservaEquipamento.findMany({
-    where: { usuarioId },
-    orderBy: { createdAt: "desc" }
-  });
+// ─── EDITAR ───────────────────────────────────────────────────────────────────
+
+export async function editar(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reserva = await service.editar(
+      Number(req.params.id),
+      (req as ReqComUsuario).usuario,
+      req.body
+    );
+    return res.status(200).json({
+      sucesso: true,
+      mensagem: "Reserva editada com sucesso",
+      dados: reserva,
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-/**
- * CONFLITOS
- */
-export async function conflitos() {
-  return prisma.reservaEquipamento.findMany({
-    where: { status: "PENDENTE" }
-  });
+// ─── DISPONIBILIDADE ──────────────────────────────────────────────────────────
+
+export async function disponibilidade(req: Request, res: Response, next: NextFunction) {
+  try {
+    const resultado = await service.disponibilidade(
+      Number(req.params.equipamentoId),
+      req.query.data as string | undefined as any
+    );
+    return res.status(200).json({
+      sucesso: true,
+      dados: resultado,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+//COMPROVATIVO
+import { gerarComprovatiyoEquipamentoPDF } from "../utils/gerarComprovativo";
+
+export async function comprovativo(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reserva = await service.comprovativo(
+      Number(req.params.id),
+      (req as ReqComUsuario).usuario
+    );
+    gerarComprovatiyoEquipamentoPDF(reserva, res);
+  } catch (err) {
+    next(err);
+  }
 }

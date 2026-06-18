@@ -1,5 +1,4 @@
 import { Router } from "express";
-
 import {
   criar,
   listar,
@@ -7,12 +6,9 @@ import {
   editar,
   disponibilidade,
   quantidade,
-  estado,
   disponiveis,
-  conflitos,
   remover,
 } from "../controllers/equipamento.controller";
-
 import { autenticar } from "../middlewares/autenticar";
 import { permitirPapeis } from "../middlewares/permitirPapeis";
 
@@ -25,6 +21,7 @@ const router = Router();
  *   description: Gestão de equipamentos
  */
 
+// ─── CRIAR ────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos:
@@ -33,13 +30,7 @@ const router = Router();
  *     tags: [Equipamentos]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       Apenas ADMIN.
- *
- *       Regras:
- *       - Código único
- *       - Quantidade disponível não pode ser superior à quantidade total
- *       - Tipo de equipamento deve existir
+ *     description: Apenas ADMIN
  *     requestBody:
  *       required: true
  *       content:
@@ -80,6 +71,8 @@ const router = Router();
  *         description: Não autenticado
  *       403:
  *         description: Sem permissão
+ *       409:
+ *         description: Código já existe
  */
 router.post(
   "/",
@@ -88,6 +81,33 @@ router.post(
   criar
 );
 
+//  rota estática /disponiveis declarada ANTES de /:id
+// Se ficar depois, o Express captura "disponiveis" como id e a rota nunca é alcançada
+/**
+ * @swagger
+ * /api/equipamentos/disponiveis:
+ *   get:
+ *     summary: Ver equipamentos disponíveis
+ *     tags: [Equipamentos]
+ *     security:
+ *       - bearerAuth: []
+ *     description: Devolve equipamentos com estado DISPONIVEL e quantidade > 0
+ *     responses:
+ *       200:
+ *         description: Lista de equipamentos disponíveis
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
+ */
+router.get(
+  "/disponiveis",
+  autenticar,
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  disponiveis
+);
+
+// ─── LISTAR ───────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos:
@@ -96,31 +116,27 @@ router.post(
  *     tags: [Equipamentos]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       Perfis permitidos:
- *       - ADMIN
- *       - FUNCIONARIO
- *       - USUARIO
  *     responses:
  *       200:
  *         description: Lista de equipamentos
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
  */
 router.get(
   "/",
   autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO",
-    "USUARIO"
-  ),
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
   listar
 );
 
+// ─── VER ──────────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos/{id}:
  *   get:
- *     summary: Ver equipamento
+ *     summary: Ver equipamento por ID
  *     tags: [Equipamentos]
  *     security:
  *       - bearerAuth: []
@@ -133,20 +149,21 @@ router.get(
  *     responses:
  *       200:
  *         description: Equipamento encontrado
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
  *       404:
  *         description: Equipamento não encontrado
  */
 router.get(
   "/:id",
   autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO",
-    "USUARIO"
-  ),
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
   ver
 );
 
+// ─── EDITAR ───────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos/{id}:
@@ -162,7 +179,6 @@ router.get(
  *         required: true
  *         schema:
  *           type: integer
- *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -175,18 +191,28 @@ router.get(
  *                 example: Projetor Epson X2
  *               descricao:
  *                 type: string
- *                 example: Nova descrição
  *               quantidadeTotal:
  *                 type: integer
  *                 example: 15
  *               quantidadeDisponivel:
  *                 type: integer
  *                 example: 12
+ *               tipoEquipamentoId:
+ *                 type: integer
+ *                 example: 2
  *     responses:
  *       200:
  *         description: Equipamento actualizado
+ *       400:
+ *         description: Dados inválidos
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
  *       404:
  *         description: Equipamento não encontrado
+ *       409:
+ *         description: Código já em uso
  */
 router.patch(
   "/:id",
@@ -195,11 +221,12 @@ router.patch(
   editar
 );
 
+// ─── DISPONIBILIDADE ──────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos/{id}/disponibilidade:
  *   patch:
- *     summary: Alterar disponibilidade
+ *     summary: Alterar estado do equipamento
  *     tags: [Equipamentos]
  *     security:
  *       - bearerAuth: []
@@ -210,7 +237,6 @@ router.patch(
  *         required: true
  *         schema:
  *           type: integer
- *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -222,27 +248,28 @@ router.patch(
  *             properties:
  *               estado:
  *                 type: string
- *                 enum:
- *                   - DISPONIVEL
- *                   - INDISPONIVEL
- *                   - MANUTENCAO
+ *                 enum: [DISPONIVEL, INDISPONIVEL, MANUTENCAO]
  *                 example: DISPONIVEL
  *     responses:
  *       200:
- *         description: Disponibilidade alterada
+ *         description: Estado actualizado
+ *       400:
+ *         description: Estado inválido
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
  *       404:
  *         description: Equipamento não encontrado
  */
 router.patch(
   "/:id/disponibilidade",
   autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO"
-  ),
+  permitirPapeis("ADMIN", "FUNCIONARIO"),
   disponibilidade
 );
 
+// ─── QUANTIDADE ───────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos/{id}/quantidade:
@@ -258,7 +285,6 @@ router.patch(
  *         required: true
  *         schema:
  *           type: integer
- *           example: 1
  *     requestBody:
  *       required: true
  *       content:
@@ -266,98 +292,31 @@ router.patch(
  *           schema:
  *             type: object
  *             required:
- *               - quantidadeDisponivel
+ *               - quantidadeTotal
  *             properties:
- *               quantidadeDisponivel:
+ *               quantidadeTotal:
  *                 type: integer
- *                 example: 8
+ *                 example: 10
  *     responses:
  *       200:
- *         description: Quantidade alterada
+ *         description: Quantidade actualizada
  *       400:
  *         description: Quantidade inválida
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
  *       404:
  *         description: Equipamento não encontrado
  */
 router.patch(
   "/:id/quantidade",
   autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO"
-  ),
+  permitirPapeis("ADMIN", "FUNCIONARIO"),
   quantidade
 );
 
-/**
- * @swagger
- * /api/equipamentos/{id}/estado:
- *   patch:
- *     summary: Alterar estado
- *     tags: [Equipamentos]
- *     security:
- *       - bearerAuth: []
- *     description: Apenas ADMIN
- *     responses:
- *       200:
- *         description: Estado alterado
- */
-router.patch(
-  "/:id/estado",
-  autenticar,
-  permitirPapeis("ADMIN"),
-  estado
-);
-
-/**
- * @swagger
- * /api/equipamentos/disponiveis:
- *   get:
- *     summary: Ver disponíveis
- *     tags: [Equipamentos]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de equipamentos disponíveis
- */
-router.get(
-  "/disponiveis",
-  autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO",
-    "USUARIO"
-  ),
-  disponiveis
-);
-
-/**
- * @swagger
- * /api/equipamentos/conflitos:
- *   get:
- *     summary: Ver conflitos
- *     tags: [Equipamentos]
- *     security:
- *       - bearerAuth: []
- *     description: |
- *       Apenas:
- *       - ADMIN
- *       - FUNCIONARIO
- *     responses:
- *       200:
- *         description: Lista de conflitos
- */
-router.get(
-  "/conflitos",
-  autenticar,
-  permitirPapeis(
-    "ADMIN",
-    "FUNCIONARIO"
-  ),
-  conflitos
-);
-
+// ─── REMOVER ──────────────────────────────────────────────────────────────────
 /**
  * @swagger
  * /api/equipamentos/{id}:
@@ -367,9 +326,23 @@ router.get(
  *     security:
  *       - bearerAuth: []
  *     description: Apenas ADMIN
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Equipamento removido
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
+ *       404:
+ *         description: Equipamento não encontrado
+ *       409:
+ *         description: Equipamento com reservas associadas
  */
 router.delete(
   "/:id",

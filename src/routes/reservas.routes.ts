@@ -5,8 +5,8 @@ import {
   minhas,
   ver,
   cancelar,
-  historico,
-  conflitos
+  editar,
+  disponibilidade,  comprovativo,
 } from "../controllers/reserva.controller";
 
 import { autenticar } from "../middlewares/autenticar";
@@ -18,13 +18,14 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Reservas
- *   description: Gestão completa de reservas de salas
+ *   description: Gestão de reservas de salas
  */
 
+//
+// =======================
+// CRIAR RESERVA
+// =======================
 /**
- * =========================
- * CRIAR RESERVA
- * =========================
  * @swagger
  * /api/reservas:
  *   post:
@@ -32,16 +33,6 @@ const router = Router();
  *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
- *     description: |
- *       Permissões:
- *       - ADMIN
- *       - FUNCIONARIO
- *       - USUARIO
- *
- *       Regras:
- *       - Não pode haver sobreposição de horários
- *       - Sala deve estar disponível
- *       - Data/hora deve ser válida
  *     requestBody:
  *       required: true
  *       content:
@@ -60,7 +51,7 @@ const router = Router();
  *               data:
  *                 type: string
  *                 format: date
- *                 example: "2026-05-28"
+ *                 example: "2026-06-10"
  *               horaInicio:
  *                 type: string
  *                 example: "08:00"
@@ -74,7 +65,7 @@ const router = Router();
  *       201:
  *         description: Reserva criada com sucesso
  *       400:
- *         description: Erro de validação
+ *         description: Dados inválidos ou conflito de horário
  *       401:
  *         description: Não autenticado
  */
@@ -85,10 +76,11 @@ router.post(
   criar
 );
 
+//
+// =======================
+// LISTAR TODAS
+// =======================
 /**
- * =========================
- * LISTAR RESERVAS
- * =========================
  * @swagger
  * /api/reservas:
  *   get:
@@ -96,14 +88,9 @@ router.post(
  *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
- *     description: Apenas ADMIN e FUNCIONARIO
  *     responses:
  *       200:
  *         description: Lista de reservas
- *       401:
- *         description: Não autenticado
- *       403:
- *         description: Sem permissão
  */
 router.get(
   "/",
@@ -112,20 +99,21 @@ router.get(
   listar
 );
 
+//
+// =======================
+// MINHAS RESERVAS
+// =======================
 /**
- * =========================
- * MINHAS RESERVAS
- * =========================
  * @swagger
  * /api/reservas/minhas:
  *   get:
- *     summary: Listar reservas do utilizador logado
+ *     summary: Listar minhas reservas
  *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lista de reservas do utilizador
+ *         description: Lista do utilizador autenticado
  */
 router.get(
   "/minhas",
@@ -134,10 +122,50 @@ router.get(
   minhas
 );
 
+//
+// =======================
+// DISPONIBILIDADE DA SALA
+// =======================
 /**
- * =========================
- * VER RESERVA
- * =========================
+ * @swagger
+ * /api/reservas/sala/{salaId}/disponibilidade/{data}:
+ *   get:
+ *     summary: Ver disponibilidade da sala
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: salaId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *       - in: path
+ *         name: data
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         example: "2026-06-10"
+ *     responses:
+ *       200:
+ *         description: Disponibilidade retornada com sucesso
+ *       404:
+ *         description: Sala não encontrada
+ */
+router.get(
+  "/sala/:salaId/disponibilidade/:data",
+  autenticar,
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  disponibilidade
+);
+
+//
+// =======================
+// VER RESERVA
+// =======================
+/**
  * @swagger
  * /api/reservas/{id}:
  *   get:
@@ -151,6 +179,7 @@ router.get(
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 5
  *     responses:
  *       200:
  *         description: Reserva encontrada
@@ -164,10 +193,73 @@ router.get(
   ver
 );
 
+//
+// =======================
+// EDITAR RESERVA
+// =======================
 /**
- * =========================
- * CANCELAR RESERVA
- * =========================
+ * @swagger
+ * /api/reservas/{id}:
+ *   patch:
+ *     summary: Editar reserva
+ *     tags: [Reservas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               salaId:
+ *                 type: integer
+ *                 example: 1
+ *               data:
+ *                 type: string
+ *                 format: date
+ *                 example: "2026-06-10"
+ *               horaInicio:
+ *                 type: string
+ *                 example: "09:00"
+ *               horaFim:
+ *                 type: string
+ *                 example: "11:00"
+ *               observacao:
+ *                 type: string
+ *                 example: "Reunião atualizada"
+ *               motivoEdicao:
+ *                 type: string
+ *                 example: "Pedido do utilizador"
+ *     responses:
+ *       200:
+ *         description: Reserva editada com sucesso
+ *       400:
+ *         description: Dados inválidos ou conflito de horário
+ *       403:
+ *         description: Sem permissão
+ *       404:
+ *         description: Reserva não encontrada
+ */
+router.patch(
+  "/:id",
+  autenticar,
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  editar
+);
+
+//
+// =======================
+// CANCELAR RESERVA
+// =======================
+/**
  * @swagger
  * /api/reservas/{id}/cancelar:
  *   patch:
@@ -181,11 +273,21 @@ router.get(
  *         required: true
  *         schema:
  *           type: integer
+ *         example: 5
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               motivo:
+ *                 type: string
+ *                 example: "Sala indisponível"
  *     responses:
  *       200:
- *         description: Reserva cancelada
+ *         description: Reserva cancelada com sucesso
  *       400:
- *         description: Não é possível cancelar
+ *         description: Reserva já cancelada ou concluída
  */
 router.patch(
   "/:id/cancelar",
@@ -195,49 +297,38 @@ router.patch(
 );
 
 /**
- * =========================
- * HISTÓRICO
- * =========================
  * @swagger
- * /api/reservas/historico:
+ * /api/reservas/{id}/comprovativo:
  *   get:
- *     summary: Histórico de reservas
+ *     summary: Baixar comprovativo de reserva de sala
  *     tags: [Reservas]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 5
  *     responses:
  *       200:
- *         description: Histórico carregado
- */
-router.get(
-  "/historico",
-  autenticar,
-  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
-  historico
-);
-
-/**
- * =========================
- * CONFLITOS
- * =========================
- * @swagger
- * /api/reservas/conflitos:
- *   get:
- *     summary: Ver conflitos de reservas
- *     tags: [Reservas]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de conflitos
+ *         description: PDF gerado com sucesso
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
  *       403:
  *         description: Sem permissão
+ *       404:
+ *         description: Reserva não encontrada
  */
 router.get(
-  "/conflitos",
+  "/:id/comprovativo",
   autenticar,
-  permitirPapeis("ADMIN", "FUNCIONARIO"),
-  conflitos
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  comprovativo
 );
 
 export default router;

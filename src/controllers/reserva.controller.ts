@@ -1,18 +1,18 @@
 import { Response } from "express";
 import * as service from "../services/reserva.service";
 import { AuthRequest } from "../middlewares/autenticar";
+import { gerarComprovativoPDF } from "../utils/gerarComprovativo";
 
 // CRIAR RESERVA
 export async function criar(req: AuthRequest, res: Response) {
   const data = await service.criar(req.body, req.usuario!.id);
-
   return res.status(201).json({
     erro: false,
     dados: data,
   });
 }
 
-// LISTAR TODAS (ADMIN / FUNCIONÁRIO)
+// LISTAR TODAS
 export async function listar(req: AuthRequest, res: Response) {
   const data = await service.listar();
 
@@ -22,7 +22,7 @@ export async function listar(req: AuthRequest, res: Response) {
   });
 }
 
-// MINHAS RESERVAS (USUÁRIO)
+// MINHAS RESERVAS
 export async function minhas(req: AuthRequest, res: Response) {
   const data = await service.minhas(req.usuario!.id);
 
@@ -49,7 +49,8 @@ export async function ver(req: AuthRequest, res: Response) {
 export async function cancelar(req: AuthRequest, res: Response) {
   const data = await service.cancelar(
     Number(req.params.id),
-    req.usuario!
+    req.usuario!,
+    req.body.motivo
   );
 
   return res.json({
@@ -58,9 +59,13 @@ export async function cancelar(req: AuthRequest, res: Response) {
   });
 }
 
-// HISTÓRICO
-export async function historico(req: AuthRequest, res: Response) {
-  const data = await service.historico(req.usuario!.id);
+// EDITAR RESERVA
+export async function editar(req: AuthRequest, res: Response) {
+  const data = await service.editar(
+    Number(req.params.id),
+    req.usuario!,
+    req.body
+  );
 
   return res.json({
     erro: false,
@@ -68,12 +73,24 @@ export async function historico(req: AuthRequest, res: Response) {
   });
 }
 
-// CONFLITOS
-export async function conflitos(req: AuthRequest, res: Response) {
-  const data = await service.conflitos();
+// DISPONIBILIDADE DA SALA
+export async function disponibilidade(req: AuthRequest, res: Response) {
+  const salaId = Number(req.params.salaId);
+  const data = String(req.params.data);
+
+  const resultado = await service.disponibilidade(salaId, data);
 
   return res.json({
     erro: false,
-    dados: data,
+    dados: resultado,
   });
+}
+
+//COMPROVATIVO
+export async function comprovativo(req: AuthRequest, res: Response) {
+  const reserva = await service.comprovativo(
+    Number(req.params.id),
+    req.usuario!
+  );
+  gerarComprovativoPDF(reserva, res);
 }

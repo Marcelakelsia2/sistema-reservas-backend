@@ -46,6 +46,7 @@ const router = Router();
  *                 type: string
  *               estado:
  *                 type: string
+ *                 enum: [DISPONIVEL, INDISPONIVEL, MANUTENCAO]
  *                 example: DISPONIVEL
  *               horaInicioFuncionamento:
  *                 type: string
@@ -64,12 +65,72 @@ const router = Router();
  *         description: Não autenticado
  *       403:
  *         description: Sem permissão
+ *       409:
+ *         description: Sala com este nome já existe
  */
 router.post(
   "/",
   autenticar,
   permitirPapeis("ADMIN"),
   controller.criar
+);
+
+// rota estática /disponiveis declarada ANTES de /:id
+// Se ficar depois, o Express interpreta "disponiveis" como um id
+// e a rota nunca é alcançada.
+
+// 🟢 SALAS DISPONÍVEIS (TODOS OS AUTENTICADOS)
+/**
+ * @swagger
+ * /api/salas/disponiveis:
+ *   get:
+ *     summary: Consultar salas disponíveis
+ *     tags: [Salas]
+ *     security:
+ *       - bearerAuth: []
+ *     description: Todos os utilizadores autenticados podem consultar salas disponíveis por horário
+ *     parameters:
+ *       - in: query
+ *         name: data
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "2026-05-28"
+ *       - in: query
+ *         name: horaInicio
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "08:00"
+ *       - in: query
+ *         name: horaFim
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "10:00"
+ *       - in: query
+ *         name: capacidadeMinima
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *     responses:
+ *       200:
+ *         description: Lista de salas disponíveis
+ *       400:
+ *         description: Parâmetros inválidos
+ *       401:
+ *         description: Não autenticado
+ *       403:
+ *         description: Sem permissão
+ */
+router.get(
+  "/disponiveis",
+  autenticar,
+  // FUNCIONARIO e ADMIN também precisam consultar disponibilidade
+  // Restringir só a USUARIO bloqueia casos legítimos de gestão
+  permitirPapeis("ADMIN", "FUNCIONARIO", "USUARIO"),
+  controller.disponiveis
 );
 
 // 📄 LISTAR SALAS (TODOS)
@@ -139,7 +200,7 @@ router.get(
  *     tags: [Salas]
  *     security:
  *       - bearerAuth: []
- *     description: ADMIN pode editar salas
+ *     description: ADMIN e FUNCIONARIO podem editar salas
  *     parameters:
  *       - in: path
  *         name: id
@@ -163,6 +224,8 @@ router.get(
  *         description: Sem permissão
  *       404:
  *         description: Sala não encontrada
+ *       409:
+ *         description: Nome já em uso por outra sala
  */
 router.put(
   "/:id",
@@ -198,6 +261,7 @@ router.put(
  *             properties:
  *               estado:
  *                 type: string
+ *                 enum: [DISPONIVEL, INDISPONIVEL, MANUTENCAO]
  *                 example: DISPONIVEL
  *     responses:
  *       200:
@@ -216,77 +280,6 @@ router.patch(
   autenticar,
   permitirPapeis("ADMIN", "FUNCIONARIO"),
   controller.disponibilidade
-);
-
-// 🟢 SALAS DISPONÍVEIS (USUARIO)
-/**
- * @swagger
- * /api/salas/disponiveis:
- *   get:
- *     summary: Consultar salas disponíveis
- *     tags: [Salas]
- *     security:
- *       - bearerAuth: []
- *     description: Todos os utilizadores autenticados podem consultar salas disponíveis por horário
- *     parameters:
- *       - in: query
- *         name: data
- *         required: true
- *         schema:
- *           type: string
- *           example: 2026-05-28
- *       - in: query
- *         name: horaInicio
- *         required: true
- *         schema:
- *           type: string
- *           example: "08:00"
- *       - in: query
- *         name: horaFim
- *         required: true
- *         schema:
- *           type: string
- *           example: "10:00"
- *     responses:
- *       200:
- *         description: Lista de salas disponíveis
- *       400:
- *         description: Parâmetros inválidos
- *       401:
- *         description: Não autenticado
- *       403:
- *         description: Sem permissão
- */
-router.get(
-  "/disponiveis",
-  autenticar,
-  permitirPapeis("USUARIO"),
-  controller.disponiveis
-);
-
-// ⚠️ CONFLITOS DE RESERVAS
-/**
- * @swagger
- * /api/salas/conflitos:
- *   get:
- *     summary: Ver conflitos de reservas
- *     tags: [Salas]
- *     security:
- *       - bearerAuth: []
- *     description: ADMIN e FUNCIONARIO podem visualizar conflitos de reservas
- *     responses:
- *       200:
- *         description: Lista de conflitos
- *       401:
- *         description: Não autenticado
- *       403:
- *         description: Sem permissão
- */
-router.get(
-  "/conflitos",
-  autenticar,
-  permitirPapeis("ADMIN", "FUNCIONARIO"),
-  controller.conflitos
 );
 
 // ❌ REMOVER SALA (ADMIN)
@@ -308,14 +301,14 @@ router.get(
  *     responses:
  *       200:
  *         description: Sala removida
- *       400:
- *         description: Sala com reservas
  *       401:
  *         description: Não autenticado
  *       403:
  *         description: Sem permissão
  *       404:
  *         description: Sala não encontrada
+ *       409:
+ *         description: Sala com reservas associadas
  */
 router.delete(
   "/:id",
